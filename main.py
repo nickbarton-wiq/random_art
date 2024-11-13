@@ -310,7 +310,7 @@ if __name__ == "__main__":
     generated_expr = gen_expr(
         grammar=grammar,
         index=0,
-        depth=15
+        depth=8
         )
     print(f"Generated rule: {generated_expr}")
     print("\nRendering...")
