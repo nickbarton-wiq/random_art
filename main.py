@@ -29,6 +29,7 @@ class NodeKind:
     NK_RULE = 'rule'
     NK_NUMBER = 'number'
     NK_BOOLEAN = 'boolean'
+    NK_SQRT = 'sqrt'
     NK_ADD = 'add'
     NK_MULT = 'mult'
     NK_MOD = 'mod'
@@ -36,23 +37,6 @@ class NodeKind:
     NK_LT = 'lt'
     NK_TRIPLE = 'triple'
     NK_IF = 'if'
-
-
-nk_names = {
-    NodeKind.NK_X: 'x',
-    NodeKind.NK_Y: 'y',
-    NodeKind.NK_RULE: 'rule',
-    NodeKind.NK_RANDOM: 'random',
-    NodeKind.NK_NUMBER: 'number',
-    NodeKind.NK_ADD: 'add',
-    NodeKind.NK_MULT: 'mult',
-    NodeKind.NK_MOD: 'mod',
-    NodeKind.NK_BOOLEAN: 'boolean',
-    NodeKind.NK_GT: 'gt',
-    NodeKind.NK_LT: 'lt',
-    NodeKind.NK_TRIPLE: 'triple',
-    NodeKind.NK_IF: 'if'
-}
 
 
 class Node:
@@ -67,11 +51,13 @@ class Node:
             case NodeKind.NK_Y:
                 return "y"
             case NodeKind.NK_NUMBER:
-                return f"{self.as_data}"
+                return f"{self.as_data:.4f}"
             case NodeKind.NK_RANDOM:
                 return "random"
             case NodeKind.NK_RULE:
                 return f"rule({self.as_data})"
+            case NodeKind.NK_SQRT:
+                return f"sqrt({self.as_data['unop']})"
             case NodeKind.NK_ADD:
                 return f"add({self.as_data['lhs']}, {self.as_data['rhs']})"
             case NodeKind.NK_MULT:
@@ -111,6 +97,15 @@ def node_number(number):
 
 def node_random():
     return Node(NodeKind.NK_RANDOM, as_data=random.uniform(-1.0, 1.0))
+
+
+# UNOPS
+def node_unop(kind, operand):
+    return Node(kind, as_data={'unop': operand})
+
+
+def node_sqrt(operand):
+    return node_unop(NodeKind.NK_SQRT, operand)
 
 
 # BINOPS
@@ -161,6 +156,9 @@ def eval_node(expr, x, y):
             return node_number(y)
         case NodeKind.NK_NUMBER | NodeKind.NK_BOOLEAN:
             return expr
+        case NodeKind.NK_SQRT:
+            unop = eval_node(expr.as_data['unop'], x, y)
+            return node_number(math.sqrt(unop.as_data) if unop.as_data >= 0 else 0)
         case NodeKind.NK_ADD:
             lhs = eval_node(expr.as_data['lhs'], x, y)
             rhs = eval_node(expr.as_data['rhs'], x, y)
@@ -249,6 +247,10 @@ def gen_node(grammar, node, depth):
         case NodeKind.NK_RANDOM:
             return node_number(random.uniform(-1.0, 1.0))
 
+        case NodeKind.NK_SQRT:
+            unop = gen_node(grammar, node.as_data['unop'], depth)
+            return node_sqrt(unop)
+
         case NodeKind.NK_ADD | NodeKind.NK_MULT | NodeKind.NK_MOD | NodeKind.NK_GT | NodeKind.NK_LT:
             lhs = gen_node(grammar, node.as_data['lhs'], depth)
             rhs = gen_node(grammar, node.as_data['rhs'], depth)
@@ -285,8 +287,10 @@ def build_grammar():
     # Operations nodes
     ops_rules = [
         GrammarBranch(node_rule(1)),
+        GrammarBranch(node_sqrt(node_rule())),
         GrammarBranch(node_add(node_rule(), node_rule())),
         GrammarBranch(node_mult(node_rule(), node_rule())),
+        GrammarBranch(node_mod(node_rule(), node_rule())),
         GrammarBranch(node_if(node_gt(node_rule(), node_rule()), node_rule(), node_rule())),
         GrammarBranch(node_if(node_lt(node_rule(), node_rule()), node_rule(), node_rule())),
     ]
