@@ -249,20 +249,10 @@ def gen_node(grammar, node, depth):
         case NodeKind.NK_RANDOM:
             return node_number(random.uniform(-1.0, 1.0))
 
-        case NodeKind.NK_ADD | NodeKind.NK_MULT | NodeKind.NK_MOD:
+        case NodeKind.NK_ADD | NodeKind.NK_MULT | NodeKind.NK_MOD | NodeKind.NK_GT | NodeKind.NK_LT:
             lhs = gen_node(grammar, node.as_data['lhs'], depth)
             rhs = gen_node(grammar, node.as_data['rhs'], depth)
             return node_binop(node.kind, lhs, rhs)
-
-        case NodeKind.NK_GT:
-            lhs = gen_node(grammar, node.as_data['lhs'], depth)
-            rhs = gen_node(grammar, node.as_data['rhs'], depth)
-            return node_gt(lhs, rhs)
-
-        case NodeKind.NK_LT:
-            lhs = gen_node(grammar, node.as_data['lhs'], depth)
-            rhs = gen_node(grammar, node.as_data['rhs'], depth)
-            return node_lt(lhs, rhs)
 
         case NodeKind.NK_IF:
             cond = gen_node(grammar, node.as_data['cond'], depth)
