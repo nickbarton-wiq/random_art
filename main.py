@@ -54,7 +54,7 @@ nk_names = {
 
 
 class Node:
-    def __init__(self, kind, as_data=None):
+    def __init__(self, kind, as_data):
         self.kind = kind
         self.as_data = as_data  # Can be number, boolean, binop, triple, if structure, etc.
 
@@ -88,17 +88,17 @@ class Node:
                 raise ValueError("Unknown node type")
 
 
-def node_rule(rule_index):
+def node_rule(rule_index=random.randint(1, 2)):
     return Node(NodeKind.NK_RULE, as_data=rule_index)
 
 
 # NUMBERS
 def node_x():
-    return Node(NodeKind.NK_X)
+    return Node(NodeKind.NK_X, as_data=None)
 
 
 def node_y():
-    return Node(NodeKind.NK_Y)
+    return Node(NodeKind.NK_Y, as_data=None)
 
 
 def node_number(number):
@@ -126,13 +126,13 @@ def node_mod(lhs, rhs):
     return node_binop(NodeKind.NK_MOD, lhs, rhs)
 
 
-# BOOLEANS
-def node_boolean(boolean):
-    return Node(NodeKind.NK_BOOLEAN, as_data=boolean)
-
-
 def node_gt(lhs, rhs):
     return node_binop(NodeKind.NK_GT, lhs, rhs)
+
+
+# BOOLEAN
+def node_boolean(boolean):
+    return Node(NodeKind.NK_BOOLEAN, as_data=boolean)
 
 
 # TRIPLE
@@ -151,7 +151,7 @@ def eval_node(expr, x, y):
             return node_number(x)
         case NodeKind.NK_Y:
             return node_number(y)
-        case NodeKind.NK_NUMBER:
+        case NodeKind.NK_NUMBER | NodeKind.NK_BOOLEAN:
             return expr
         case NodeKind.NK_ADD:
             lhs = eval_node(expr.as_data['lhs'], x, y)
@@ -165,8 +165,6 @@ def eval_node(expr, x, y):
             lhs = eval_node(expr.as_data['lhs'], x, y)
             rhs = eval_node(expr.as_data['rhs'], x, y)
             return node_number(math.fmod(lhs.as_data, rhs.as_data) if rhs.as_data != 0 else 0)
-        case NodeKind.NK_BOOLEAN:
-            return expr
         case NodeKind.NK_GT:
             lhs = eval_node(expr.as_data['lhs'], x, y)
             rhs = eval_node(expr.as_data['rhs'], x, y)
@@ -228,46 +226,29 @@ def gen_terminal_node():
     return random.choice([node_x(), node_y(), node_random()])
 
 
-def is_triple(node):
-    return node.kind == NodeKind.NK_TRIPLE
-
-
 def gen_node(grammar, node, depth):
     match node.kind:
         case NodeKind.NK_RULE:
             return gen_expr(grammar, node.as_data, depth - 1)
 
-        case NodeKind.NK_X | NodeKind.NK_Y | NodeKind.NK_NUMBER:
-            return node  # These are terminal nodes
+        case NodeKind.NK_X | NodeKind.NK_Y | NodeKind.NK_NUMBER | NodeKind.NK_BOOLEAN:
+            return node
 
         case NodeKind.NK_RANDOM:
             return node_number(random.uniform(-1.0, 1.0))
 
-        case NodeKind.NK_BOOLEAN:
-            lhs = gen_node(grammar, node.as_data['lhs'], depth)
-            rhs = gen_node(grammar, node.as_data['rhs'], depth)
-            if is_triple(lhs) or is_triple(rhs):
-                return None
-            return node_gt(lhs, rhs)
-
         case NodeKind.NK_ADD | NodeKind.NK_MULT | NodeKind.NK_MOD:
             lhs = gen_node(grammar, node.as_data['lhs'], depth)
             rhs = gen_node(grammar, node.as_data['rhs'], depth)
-            if is_triple(lhs) or is_triple(rhs):
-                return None
             return node_binop(node.kind, lhs, rhs)
 
         case NodeKind.NK_GT:
             lhs = gen_node(grammar, node.as_data['lhs'], depth)
             rhs = gen_node(grammar, node.as_data['rhs'], depth)
-            if is_triple(lhs) or is_triple(rhs):
-                return None
             return node_gt(lhs, rhs)
 
         case NodeKind.NK_IF:
             cond = gen_node(grammar, node.as_data['cond'], depth)
-            if is_triple(cond):
-                return None
             then = gen_node(grammar, node.as_data['then'], depth)
             elze = gen_node(grammar, node.as_data['elze'], depth)
             return node_if(cond, then, elze)
@@ -289,19 +270,23 @@ def build_grammar():
     limit is reached, the generator is forced to generate a terminal node.
     """
     grammar = Grammar()
+    # Triple
     grammar.add_rule([
-        GrammarBranch(node_triple(node_rule(1), node_rule(2), node_rule(1)), 1.0)
+        GrammarBranch(node_triple(node_rule(1), node_rule(1), node_rule(1)), 1.0)
         ])
+    # Ops
     grammar.add_rule([
+        GrammarBranch(node_rule(1), 1.0 / 4.0),
+        GrammarBranch(node_add(node_rule(), node_rule()), 1.0 / 4.0),
+        GrammarBranch(node_mult(node_rule(), node_rule()), 1.0 / 4.0),
+        GrammarBranch(node_if(node_gt(node_rule(), node_rule()), node_rule(), node_rule()), 1.0 / 4.0),
+    ])
+    # Terminal nodes
+    grammar.add_rule([
+        GrammarBranch(node_x(), 1.0 / 3.0),
+        GrammarBranch(node_y(), 1.0 / 3.0),
         GrammarBranch(node_random(), 1.0 / 3.0),
-        GrammarBranch(node_if(node_gt(node_rule(1), node_rule(2)), node_rule(1), node_rule(1)), 1.0 / 3.0),
-        GrammarBranch(node_if(node_gt(node_rule(2), node_rule(1)), node_rule(2), node_rule(1)), 1.0 / 3.0),
-        ])
-    grammar.add_rule([
-        GrammarBranch(node_mod(node_rule(2), node_rule(1)), 1.0 / 4.0),
-        GrammarBranch(node_add(node_rule(1), node_rule(2)), 3.0 / 8.0),
-        GrammarBranch(node_mult(node_rule(2), node_rule(1)), 3.0 / 8.0)
-        ])
+    ])
     return grammar
 
 
@@ -310,7 +295,7 @@ if __name__ == "__main__":
     generated_expr = gen_expr(
         grammar=grammar,
         index=0,
-        depth=8
+        depth=15
         )
     print(f"Generated rule: {generated_expr}")
     print("\nRendering...")
