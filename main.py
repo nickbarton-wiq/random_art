@@ -9,7 +9,7 @@ GEN_RULE_MAX_ATTEMPTS = 100
 
 
 class GrammarBranch:
-    def __init__(self, node, probability):
+    def __init__(self, node, probability=1.0):
         self.node = node
         self.probability = probability
 
@@ -33,6 +33,7 @@ class NodeKind:
     NK_MULT = 'mult'
     NK_MOD = 'mod'
     NK_GT = 'gt'
+    NK_LT = 'lt'
     NK_TRIPLE = 'triple'
     NK_IF = 'if'
 
@@ -48,6 +49,7 @@ nk_names = {
     NodeKind.NK_MOD: 'mod',
     NodeKind.NK_BOOLEAN: 'boolean',
     NodeKind.NK_GT: 'gt',
+    NodeKind.NK_LT: 'lt',
     NodeKind.NK_TRIPLE: 'triple',
     NodeKind.NK_IF: 'if'
 }
@@ -80,6 +82,8 @@ class Node:
                 return f"{self.as_data}"
             case NodeKind.NK_GT:
                 return f"gt({self.as_data['lhs']}, {self.as_data['rhs']})"
+            case NodeKind.NK_LT:
+                return f"lt({self.as_data['lhs']}, {self.as_data['rhs']})"
             case NodeKind.NK_TRIPLE:
                 return f"({self.as_data['first']}, {self.as_data['second']}, {self.as_data['third']})"
             case NodeKind.NK_IF:
@@ -130,6 +134,10 @@ def node_gt(lhs, rhs):
     return node_binop(NodeKind.NK_GT, lhs, rhs)
 
 
+def node_lt(lhs, rhs):
+    return node_binop(NodeKind.NK_LT, lhs, rhs)
+
+
 # BOOLEAN
 def node_boolean(boolean):
     return Node(NodeKind.NK_BOOLEAN, as_data=boolean)
@@ -169,6 +177,10 @@ def eval_node(expr, x, y):
             lhs = eval_node(expr.as_data['lhs'], x, y)
             rhs = eval_node(expr.as_data['rhs'], x, y)
             return node_boolean(lhs.as_data > rhs.as_data)
+        case NodeKind.NK_LT:
+            lhs = eval_node(expr.as_data['lhs'], x, y)
+            rhs = eval_node(expr.as_data['rhs'], x, y)
+            return node_boolean(lhs.as_data < rhs.as_data)
         case NodeKind.NK_TRIPLE:
             first = eval_node(expr.as_data['first'], x, y)
             second = eval_node(expr.as_data['second'], x, y)
@@ -247,6 +259,11 @@ def gen_node(grammar, node, depth):
             rhs = gen_node(grammar, node.as_data['rhs'], depth)
             return node_gt(lhs, rhs)
 
+        case NodeKind.NK_LT:
+            lhs = gen_node(grammar, node.as_data['lhs'], depth)
+            rhs = gen_node(grammar, node.as_data['rhs'], depth)
+            return node_lt(lhs, rhs)
+
         case NodeKind.NK_IF:
             cond = gen_node(grammar, node.as_data['cond'], depth)
             then = gen_node(grammar, node.as_data['then'], depth)
@@ -270,17 +287,23 @@ def build_grammar():
     limit is reached, the generator is forced to generate a terminal node.
     """
     grammar = Grammar()
-    # Triple
+    # Triple (Base rule)
     grammar.add_rule([
         GrammarBranch(node_triple(node_rule(1), node_rule(1), node_rule(1)), 1.0)
         ])
-    # Ops
-    grammar.add_rule([
-        GrammarBranch(node_rule(1), 1.0 / 4.0),
-        GrammarBranch(node_add(node_rule(), node_rule()), 1.0 / 4.0),
-        GrammarBranch(node_mult(node_rule(), node_rule()), 1.0 / 4.0),
-        GrammarBranch(node_if(node_gt(node_rule(), node_rule()), node_rule(), node_rule()), 1.0 / 4.0),
-    ])
+
+    # Operations nodes
+    ops_rules = [
+        GrammarBranch(node_rule(1)),
+        GrammarBranch(node_add(node_rule(), node_rule())),
+        GrammarBranch(node_mult(node_rule(), node_rule())),
+        GrammarBranch(node_if(node_gt(node_rule(), node_rule()), node_rule(), node_rule())),
+        GrammarBranch(node_if(node_lt(node_rule(), node_rule()), node_rule(), node_rule())),
+    ]
+    for rule in ops_rules:
+        rule.probability = 1.0 / len(ops_rules)
+    grammar.add_rule(ops_rules)
+
     # Terminal nodes
     grammar.add_rule([
         GrammarBranch(node_x(), 1.0 / 3.0),
