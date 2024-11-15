@@ -236,20 +236,48 @@ class Color:
         return f"Color({self.r}, {self.g}, {self.b}, {self.a})"
 
 
-def render_pixels(expr):
+class Pixel:
+    def __init__(self, x: int, y: int, expr):
+        """Initializes a pixel at x, y with and passes an expression to evaluate on the pixel
+
+        Args:
+            x (int): the x coordinate of the pixel
+            y (int): the y coordinate of the pixel
+            expr: the expression to evaluate on the pixel
+        """
+        self.x = x
+        self.y = y
+        self.expr = expr
+        self.normalize_xy()
+
+    def normalize_xy(self):
+        """normalize the x and y values to -1 to 1
+        """
+        self.nx = float(self.x) / WIDTH * 2.0 - 1
+        self.ny = float(self.y) / HEIGHT * 2.0 - 1
+
+    def eval(self) -> Node:
+        """Evaluates the expression
+
+        Returns:
+            Node: the evaluated node
+        """
+        return eval_node(self.expr, self.nx, self.ny)
+
+    @property
+    def color(self):
+        return Color(
+            r=self.eval().as_data['first'].as_data,
+            g=self.eval().as_data['second'].as_data,
+            b=self.eval().as_data['third'].as_data,
+        ).rgb()
+
+
+def render_pixels_to_image(expr):
     pixel_array = np.zeros((WIDTH, HEIGHT, 3), dtype=np.uint8)
     for y in range(HEIGHT):
-        ny = float(y) / HEIGHT * 2.0 - 1
         for x in range(WIDTH):
-            nx = float(x) / WIDTH * 2.0 - 1
-            result = eval_node(expr, nx, ny)
-            pixel_array[y, x] = (
-                Color(
-                    r=result.as_data['first'].as_data,
-                    g=result.as_data['second'].as_data,
-                    b=result.as_data['third'].as_data,
-                ).rgb()
-            )
+            pixel_array[y, x] = Pixel(x, y, expr).color
 
     image = Image.fromarray(pixel_array, 'RGB')
     image.save("output.png")
@@ -334,7 +362,7 @@ def build_grammar():
         GrammarBranch(node_rule(1)),
         GrammarBranch(node_add(node_rule(), node_rule())),
         GrammarBranch(node_mult(node_rule(), node_rule())),
-        GrammarBranch(node_if(node_lt(node_rule(), node_rule()), node_rule(), node_rule())),
+        GrammarBranch(node_if(node_lt(node_rule(), node_number(0.1)), node_rule(), node_rule())),
         # GrammarBranch(node_if(node_gt(node_rule(), node_rule()), node_rule(), node_rule())),
         # GrammarBranch(node_sqrt(node_rule())),
         # GrammarBranch(node_sqrt(node_add(node_mult(node_x(), node_x()),
@@ -360,8 +388,8 @@ if __name__ == "__main__":
     generated_expr = gen_expr(
         grammar=grammar,
         index=0,
-        depth=20
+        depth=15
         )
     print(f"\nGenerated rule: {generated_expr}")
     print("\nRendering...")
-    render_pixels(generated_expr)
+    render_pixels_to_image(generated_expr)
