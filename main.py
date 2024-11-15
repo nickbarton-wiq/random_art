@@ -1,10 +1,10 @@
 from PIL import Image
 import math
 import random
+import numpy as np
 
 WIDTH = 400
 HEIGHT = 400
-pixels = [(0, 0, 0, 255) for _ in range(WIDTH * HEIGHT)]
 GEN_RULE_MAX_ATTEMPTS = 100
 
 
@@ -51,7 +51,7 @@ class Node:
             case NodeKind.NK_Y:
                 return "y"
             case NodeKind.NK_NUMBER:
-                return f"{self.as_data:.4f}"
+                return f"{self.as_data:.6f}"
             case NodeKind.NK_RANDOM:
                 return "random"
             case NodeKind.NK_RULE:
@@ -71,14 +71,14 @@ class Node:
             case NodeKind.NK_LT:
                 return f"lt({self.as_data['lhs']}, {self.as_data['rhs']})"
             case NodeKind.NK_TRIPLE:
-                return f"({self.as_data['first']}, {self.as_data['second']}, {self.as_data['third']})"
+                return f"(\nR: {self.as_data['first']},\nG: {self.as_data['second']},\nB: {self.as_data['third']}\n)"
             case NodeKind.NK_IF:
                 return f"if({self.as_data['cond']}, {self.as_data['then']}, {self.as_data['elze']})"
             case _:
                 raise ValueError("Unknown node type")
 
 
-def node_rule(rule_index=random.randint(1, 2)):
+def node_rule(rule_index=1):  # random.randint(0, 1) + 1):
     return Node(NodeKind.NK_RULE, as_data=rule_index)
 
 
@@ -148,7 +148,7 @@ def node_if(cond, then, elze):
     return Node(NodeKind.NK_IF, as_data={'cond': cond, 'then': then, 'elze': elze})
 
 
-def eval_node(expr, x, y):
+def eval_node(expr, x, y) -> Node:
     match expr.kind:
         case NodeKind.NK_X:
             return node_number(x)
@@ -158,7 +158,7 @@ def eval_node(expr, x, y):
             return expr
         case NodeKind.NK_SQRT:
             unop = eval_node(expr.as_data['unop'], x, y)
-            return node_number(math.sqrt(unop.as_data) if unop.as_data >= 0 else 0)
+            return node_number(math.sqrt(unop.as_data) if unop.as_data > 0 else 0)
         case NodeKind.NK_ADD:
             lhs = eval_node(expr.as_data['lhs'], x, y)
             rhs = eval_node(expr.as_data['rhs'], x, y)
@@ -190,22 +190,68 @@ def eval_node(expr, x, y):
             elze = eval_node(expr.as_data['elze'], x, y)
             return then if cond.as_data else elze
         case _:
-            return None
+            raise ValueError("Unknown node type")
+
+
+class Color:
+    def __init__(self, r, g, b, a=255):
+        self.r = self.scale(r)
+        self.g = self.scale(g)
+        self.b = self.scale(b)
+        self.a = self.scale(a)
+
+    def scale(self, value: float) -> int:
+        """scales a value between -inf and inf to 0-255
+
+        Args:
+            value (float): value to scale
+
+        Returns:
+            int: scaled value
+        """
+        return self.check_rgb(int((math.tanh(value) + 1) / 2 * 255))
+
+    def check_rgb(self, rgb: int) -> int:
+        """Checks if the RGB value is within bounds of 0-255
+
+        Args:
+            rgb (int): RGB value
+
+        Returns:
+            int: RGB value
+        """
+        if rgb < 0 or rgb > 255:
+            raise ValueError(f"Out of bounds: {self}")
+        return rgb
+
+    def rgb(self) -> tuple[int, int, int]:
+        """Returns the color as an RGBA tuple
+
+        Returns:
+            tuple[int, int, int, int]: RGBA tuple
+        """
+        return self.r, self.g, self.b
+
+    def __repr__(self):
+        return f"Color({self.r}, {self.g}, {self.b}, {self.a})"
 
 
 def render_pixels(expr):
-    image = Image.new("RGB", (HEIGHT, WIDTH))
-    pixels = image.load()
+    pixel_array = np.zeros((WIDTH, HEIGHT, 3), dtype=np.uint8)
     for y in range(HEIGHT):
-        ny = y / HEIGHT * 2.0 - 1
+        ny = float(y) / HEIGHT * 2.0 - 1
         for x in range(WIDTH):
-            nx = x / WIDTH * 2.0 - 1
+            nx = float(x) / WIDTH * 2.0 - 1
             result = eval_node(expr, nx, ny)
-            if result and isinstance(result, Node) and result.kind == NodeKind.NK_TRIPLE:
-                r = int((result.as_data['first'].as_data + 1) / 2 * 255)
-                g = int((result.as_data['second'].as_data + 1) / 2 * 255)
-                b = int((result.as_data['third'].as_data + 1) / 2 * 255)
-                pixels[x, y] = (r, g, b, 255)
+            pixel_array[y, x] = (
+                Color(
+                    r=result.as_data['first'].as_data,
+                    g=result.as_data['second'].as_data,
+                    b=result.as_data['third'].as_data,
+                ).rgb()
+            )
+
+    image = Image.fromarray(pixel_array, 'RGB')
     image.save("output.png")
     print("Image saved as chatgpt.png")
 
@@ -275,8 +321,7 @@ def gen_node(grammar, node, depth):
 def build_grammar():
     """The Grammar gives the generator choices on how to generate our node rules.  We need a triple to generate the RGB,
     so we pass grammar index 0 (triple) to the generator first.  From there, the generator will keep generating nodes
-    given the grammar until it reaches a terminal node (x, y, or random) or the depth limit is reached.  If the depth
-    limit is reached, the generator is forced to generate a terminal node.
+    given the grammar until it reaches a terminal node (x, y, or random) or the depth limit is reached.
     """
     grammar = Grammar()
     # Triple (Base rule)
@@ -287,12 +332,15 @@ def build_grammar():
     # Operations nodes
     ops_rules = [
         GrammarBranch(node_rule(1)),
-        GrammarBranch(node_sqrt(node_rule())),
         GrammarBranch(node_add(node_rule(), node_rule())),
         GrammarBranch(node_mult(node_rule(), node_rule())),
-        GrammarBranch(node_mod(node_rule(), node_rule())),
-        GrammarBranch(node_if(node_gt(node_rule(), node_rule()), node_rule(), node_rule())),
         GrammarBranch(node_if(node_lt(node_rule(), node_rule()), node_rule(), node_rule())),
+        # GrammarBranch(node_if(node_gt(node_rule(), node_rule()), node_rule(), node_rule())),
+        # GrammarBranch(node_sqrt(node_rule())),
+        # GrammarBranch(node_sqrt(node_add(node_mult(node_x(), node_x()),
+        #                                  node_mult(node_y(), node_y())),
+        #                         )),
+        # GrammarBranch(node_mod(node_rule(), node_rule())),
     ]
     for rule in ops_rules:
         rule.probability = 1.0 / len(ops_rules)
@@ -312,8 +360,8 @@ if __name__ == "__main__":
     generated_expr = gen_expr(
         grammar=grammar,
         index=0,
-        depth=15
+        depth=20
         )
-    print(f"Generated rule: {generated_expr}")
+    print(f"\nGenerated rule: {generated_expr}")
     print("\nRendering...")
     render_pixels(generated_expr)
