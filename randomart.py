@@ -3,8 +3,8 @@ import math
 import random
 import numpy as np
 
-WIDTH = 400
-HEIGHT = 400
+WIDTH = 1600
+HEIGHT = 900
 GEN_RULE_MAX_ATTEMPTS = 100
 
 
@@ -25,6 +25,7 @@ class Grammar:
 class NodeKind:
     NK_X = 'x'
     NK_Y = 'y'
+    NK_T = 't'
     NK_RANDOM = 'random'
     NK_RULE = 'rule'
     NK_NUMBER = 'number'
@@ -50,6 +51,8 @@ class Node:
                 return "x"
             case NodeKind.NK_Y:
                 return "y"
+            case NodeKind.NK_T:
+                return "t"
             case NodeKind.NK_NUMBER:
                 return f"{self.as_data:.6f}"
             case NodeKind.NK_RANDOM:
@@ -89,6 +92,10 @@ def node_x():
 
 def node_y():
     return Node(NodeKind.NK_Y, as_data=None)
+
+
+def node_t():
+    return Node(NodeKind.NK_T, as_data=None)
 
 
 def node_number(number):
@@ -148,46 +155,48 @@ def node_if(cond, then, elze):
     return Node(NodeKind.NK_IF, as_data={'cond': cond, 'then': then, 'elze': elze})
 
 
-def eval_node(expr, x, y) -> Node:
+def eval_node(expr, x, y, t) -> Node:
     match expr.kind:
         case NodeKind.NK_X:
             return node_number(x)
         case NodeKind.NK_Y:
             return node_number(y)
+        case NodeKind.NK_T:
+            return node_number(t)
         case NodeKind.NK_NUMBER | NodeKind.NK_BOOLEAN:
             return expr
         case NodeKind.NK_SQRT:
-            unop = eval_node(expr.as_data['unop'], x, y)
+            unop = eval_node(expr.as_data['unop'], x, y, t)
             return node_number(math.sqrt(unop.as_data) if unop.as_data > 0 else 0)
         case NodeKind.NK_ADD:
-            lhs = eval_node(expr.as_data['lhs'], x, y)
-            rhs = eval_node(expr.as_data['rhs'], x, y)
+            lhs = eval_node(expr.as_data['lhs'], x, y, t)
+            rhs = eval_node(expr.as_data['rhs'], x, y, t)
             return node_number(lhs.as_data + rhs.as_data)
         case NodeKind.NK_MULT:
-            lhs = eval_node(expr.as_data['lhs'], x, y)
-            rhs = eval_node(expr.as_data['rhs'], x, y)
+            lhs = eval_node(expr.as_data['lhs'], x, y, t)
+            rhs = eval_node(expr.as_data['rhs'], x, y, t)
             return node_number(lhs.as_data * rhs.as_data)
         case NodeKind.NK_MOD:
-            lhs = eval_node(expr.as_data['lhs'], x, y)
-            rhs = eval_node(expr.as_data['rhs'], x, y)
+            lhs = eval_node(expr.as_data['lhs'], x, y, t)
+            rhs = eval_node(expr.as_data['rhs'], x, y, t)
             return node_number(math.fmod(lhs.as_data, rhs.as_data) if rhs.as_data != 0 else 0)
         case NodeKind.NK_GT:
-            lhs = eval_node(expr.as_data['lhs'], x, y)
-            rhs = eval_node(expr.as_data['rhs'], x, y)
+            lhs = eval_node(expr.as_data['lhs'], x, y, t)
+            rhs = eval_node(expr.as_data['rhs'], x, y, t)
             return node_boolean(lhs.as_data > rhs.as_data)
         case NodeKind.NK_LT:
-            lhs = eval_node(expr.as_data['lhs'], x, y)
-            rhs = eval_node(expr.as_data['rhs'], x, y)
+            lhs = eval_node(expr.as_data['lhs'], x, y, t)
+            rhs = eval_node(expr.as_data['rhs'], x, y, t)
             return node_boolean(lhs.as_data < rhs.as_data)
         case NodeKind.NK_TRIPLE:
-            first = eval_node(expr.as_data['first'], x, y)
-            second = eval_node(expr.as_data['second'], x, y)
-            third = eval_node(expr.as_data['third'], x, y)
+            first = eval_node(expr.as_data['first'], x, y, t)
+            second = eval_node(expr.as_data['second'], x, y, t)
+            third = eval_node(expr.as_data['third'], x, y, t)
             return node_triple(first, second, third)
         case NodeKind.NK_IF:
-            cond = eval_node(expr.as_data['cond'], x, y)
-            then = eval_node(expr.as_data['then'], x, y)
-            elze = eval_node(expr.as_data['elze'], x, y)
+            cond = eval_node(expr.as_data['cond'], x, y, t)
+            then = eval_node(expr.as_data['then'], x, y, t)
+            elze = eval_node(expr.as_data['elze'], x, y, t)
             return then if cond.as_data else elze
         case _:
             raise ValueError("Unknown node type")
@@ -262,7 +271,7 @@ class Pixel:
         Returns:
             Node: the evaluated node
         """
-        return eval_node(self.expr, self.nx, self.ny)
+        return eval_node(self.expr, self.nx, self.ny, 0.0)
 
     @property
     def color(self):
@@ -307,7 +316,7 @@ def gen_expr(grammar, index, depth):
 
 
 def gen_terminal_node():
-    return random.choice([node_x(), node_y(), node_random()])
+    return random.choice([node_x(), node_y(), node_t(), node_random()])
 
 
 def gen_node(grammar, node, depth):
@@ -315,7 +324,7 @@ def gen_node(grammar, node, depth):
         case NodeKind.NK_RULE:
             return gen_expr(grammar, node.as_data, depth - 1)
 
-        case NodeKind.NK_X | NodeKind.NK_Y | NodeKind.NK_NUMBER | NodeKind.NK_BOOLEAN:
+        case NodeKind.NK_X | NodeKind.NK_Y | NodeKind.NK_T | NodeKind.NK_NUMBER | NodeKind.NK_BOOLEAN:
             return node
 
         case NodeKind.NK_RANDOM:
@@ -362,12 +371,12 @@ def build_grammar():
         GrammarBranch(node_rule(1)),
         GrammarBranch(node_add(node_rule(), node_rule())),
         GrammarBranch(node_mult(node_rule(), node_rule())),
-        GrammarBranch(node_if(node_lt(node_rule(), node_number(0.1)), node_rule(), node_rule())),
-        # GrammarBranch(node_if(node_gt(node_rule(), node_rule()), node_rule(), node_rule())),
+        GrammarBranch(node_if(node_lt(node_rule(), node_rule()), node_rule(), node_rule())),
+        GrammarBranch(node_if(node_gt(node_rule(), node_rule()), node_rule(), node_rule())),
         # GrammarBranch(node_sqrt(node_rule())),
-        # GrammarBranch(node_sqrt(node_add(node_mult(node_x(), node_x()),
-        #                                  node_mult(node_y(), node_y())),
-        #                         )),
+        GrammarBranch(node_sqrt(node_add(node_mult(node_x(), node_x()),
+                                         node_mult(node_y(), node_y())),
+                                )),
         # GrammarBranch(node_mod(node_rule(), node_rule())),
     ]
     for rule in ops_rules:
@@ -376,20 +385,58 @@ def build_grammar():
 
     # Terminal nodes
     grammar.add_rule([
+        GrammarBranch(node_t(), 1.0 / 3.0),
         GrammarBranch(node_x(), 1.0 / 3.0),
         GrammarBranch(node_y(), 1.0 / 3.0),
-        GrammarBranch(node_random(), 1.0 / 3.0),
+        # GrammarBranch(node_random(), 1.0 / 4.0),
     ])
     return grammar
 
 
-if __name__ == "__main__":
+def gen_fragment_expr(generated_expr):
+    match generated_expr.kind:
+        case NodeKind.NK_X:
+            return "x"
+        case NodeKind.NK_Y:
+            return "y"
+        case NodeKind.NK_T:
+            return "t"
+        case NodeKind.NK_NUMBER:
+            return f"{generated_expr.as_data:.6f}"
+        case NodeKind.NK_ADD:
+            return f"({gen_fragment_expr(generated_expr.as_data['lhs'])} + {gen_fragment_expr(generated_expr.as_data['rhs'])})"
+        case NodeKind.NK_MULT:
+            return f"({gen_fragment_expr(generated_expr.as_data['lhs'])} * {gen_fragment_expr(generated_expr.as_data['rhs'])})"
+        case NodeKind.NK_MOD:
+            return f"mod({gen_fragment_expr(generated_expr.as_data['lhs'])}, {gen_fragment_expr(generated_expr.as_data['rhs'])})"
+        case NodeKind.NK_GT:
+            return f"({gen_fragment_expr(generated_expr.as_data['lhs'])} > {gen_fragment_expr(generated_expr.as_data['rhs'])})"
+        case NodeKind.NK_LT:
+            return f"({gen_fragment_expr(generated_expr.as_data['lhs'])} < {gen_fragment_expr(generated_expr.as_data['rhs'])})"
+        case NodeKind.NK_SQRT:
+            return f"sqrt({gen_fragment_expr(generated_expr.as_data['unop'])})"
+        case NodeKind.NK_TRIPLE:
+            return f"vec3({gen_fragment_expr(generated_expr.as_data['first'])}, {gen_fragment_expr(generated_expr.as_data['second'])}, {gen_fragment_expr(generated_expr.as_data['third'])})"
+        case NodeKind.NK_IF:
+            return f"({gen_fragment_expr(generated_expr.as_data['cond'])} ? {gen_fragment_expr(generated_expr.as_data['then'])} : {gen_fragment_expr(generated_expr.as_data['elze'])})"
+        case _:
+            raise ValueError("Unknown node type")
+
+
+def main():
     grammar = build_grammar()
     generated_expr = gen_expr(
         grammar=grammar,
         index=0,
-        depth=15
+        depth=25
         )
     print(f"\nGenerated rule: {generated_expr}")
     print("\nRendering...")
-    render_pixels_to_image(generated_expr)
+    # render_pixels_to_image(generated_expr)
+    fragment_expression = gen_fragment_expr(generated_expr)
+    print(f"\nFragment expression:\n{fragment_expression}")
+    return fragment_expression
+
+
+if __name__ == "__main__":
+    main()

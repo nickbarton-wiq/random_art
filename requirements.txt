@@ -1,1 +1,7 @@
 Pillow
+numpy
+PyOpenGL
+pygame
+moderngl
+moderngl-window
+glfw
