@@ -5,7 +5,7 @@ import pygame
 import moderngl
 import moderngl_window
 
-from randomart import main
+from randomart import get_fragment_shader
 
 
 class Pygame(moderngl_window.WindowConfig):
@@ -63,7 +63,7 @@ class Pygame(moderngl_window.WindowConfig):
                     float x = fragTexCoord.x*2.0 - 1.0;
                     float y = fragTexCoord.y*2.0 - 1.0;
                     float t = sin(time);
-                    finalColor = map_color(""" + main() + """);
+                    finalColor = map_color(""" + get_fragment_shader() + """);
                 }
             """,
         )
@@ -114,4 +114,4 @@ class Pygame(moderngl_window.WindowConfig):
 
 
 if __name__ == '__main__':
-    moderngl_window.run_window_config(Pygame, args=('--window', 'pygame2'))
+    moderngl_window.run_window_config(Pygame, args=('--window', 'pygame2'))  # type: ignore
