@@ -312,7 +312,8 @@ def gen_expr(grammar, index, depth):
                 break
     if node is None:
         print(f"Failed to generate a node for grammar {index} after {GEN_RULE_MAX_ATTEMPTS} attempts")
-    return node
+    else:
+        return node
 
 
 def gen_terminal_node():
@@ -371,12 +372,12 @@ def build_grammar():
         GrammarBranch(node_rule(1)),
         GrammarBranch(node_add(node_rule(), node_rule())),
         GrammarBranch(node_mult(node_rule(), node_rule())),
-        GrammarBranch(node_if(node_lt(node_rule(), node_rule()), node_rule(), node_rule())),
-        GrammarBranch(node_if(node_gt(node_rule(), node_rule()), node_rule(), node_rule())),
+        # GrammarBranch(node_if(node_lt(node_rule(), node_rule()), node_rule(), node_rule())),
+        # GrammarBranch(node_if(node_gt(node_rule(), node_rule()), node_rule(), node_rule())),
         # GrammarBranch(node_sqrt(node_rule())),
-        GrammarBranch(node_sqrt(node_add(node_mult(node_x(), node_x()),
-                                         node_mult(node_y(), node_y())),
-                                )),
+        # GrammarBranch(node_sqrt(node_add(node_mult(node_x(), node_x()),
+        #                                  node_mult(node_y(), node_y())),
+        #                         )),
         # GrammarBranch(node_mod(node_rule(), node_rule())),
     ]
     for rule in ops_rules:
@@ -393,8 +394,19 @@ def build_grammar():
     return grammar
 
 
-def gen_fragment_expr(generated_expr):
-    match generated_expr.kind:
+def gen_fragment_expr(node: Node) -> str:
+    """Generates a fragment shader expression from a node
+
+    Args:
+        node (Node): the node to generate the expression from
+
+    Raises:
+        ValueError: if the node kind is unknown
+
+    Returns:
+        str: the fragment shader expression
+    """
+    match node.kind:
         case NodeKind.NK_X:
             return "x"
         case NodeKind.NK_Y:
@@ -402,23 +414,23 @@ def gen_fragment_expr(generated_expr):
         case NodeKind.NK_T:
             return "t"
         case NodeKind.NK_NUMBER:
-            return f"{generated_expr.as_data:.6f}"
+            return f"{node.as_data:.6f}"
         case NodeKind.NK_ADD:
-            return f"({gen_fragment_expr(generated_expr.as_data['lhs'])} + {gen_fragment_expr(generated_expr.as_data['rhs'])})"
+            return f"({gen_fragment_expr(node.as_data['lhs'])} + {gen_fragment_expr(node.as_data['rhs'])})"
         case NodeKind.NK_MULT:
-            return f"({gen_fragment_expr(generated_expr.as_data['lhs'])} * {gen_fragment_expr(generated_expr.as_data['rhs'])})"
+            return f"({gen_fragment_expr(node.as_data['lhs'])} * {gen_fragment_expr(node.as_data['rhs'])})"
         case NodeKind.NK_MOD:
-            return f"mod({gen_fragment_expr(generated_expr.as_data['lhs'])}, {gen_fragment_expr(generated_expr.as_data['rhs'])})"
+            return f"mod({gen_fragment_expr(node.as_data['lhs'])}, {gen_fragment_expr(node.as_data['rhs'])})"
         case NodeKind.NK_GT:
-            return f"({gen_fragment_expr(generated_expr.as_data['lhs'])} > {gen_fragment_expr(generated_expr.as_data['rhs'])})"
+            return f"({gen_fragment_expr(node.as_data['lhs'])} > {gen_fragment_expr(node.as_data['rhs'])})"
         case NodeKind.NK_LT:
-            return f"({gen_fragment_expr(generated_expr.as_data['lhs'])} < {gen_fragment_expr(generated_expr.as_data['rhs'])})"
+            return f"({gen_fragment_expr(node.as_data['lhs'])} < {gen_fragment_expr(node.as_data['rhs'])})"
         case NodeKind.NK_SQRT:
-            return f"sqrt({gen_fragment_expr(generated_expr.as_data['unop'])})"
+            return f"sqrt({gen_fragment_expr(node.as_data['unop'])})"
         case NodeKind.NK_TRIPLE:
-            return f"vec3({gen_fragment_expr(generated_expr.as_data['first'])}, {gen_fragment_expr(generated_expr.as_data['second'])}, {gen_fragment_expr(generated_expr.as_data['third'])})"
+            return f"vec3({gen_fragment_expr(node.as_data['first'])}, {gen_fragment_expr(node.as_data['second'])}, {gen_fragment_expr(node.as_data['third'])})" # noqa
         case NodeKind.NK_IF:
-            return f"({gen_fragment_expr(generated_expr.as_data['cond'])} ? {gen_fragment_expr(generated_expr.as_data['then'])} : {gen_fragment_expr(generated_expr.as_data['elze'])})"
+            return f"({gen_fragment_expr(node.as_data['cond'])} ? {gen_fragment_expr(node.as_data['then'])} : {gen_fragment_expr(node.as_data['elze'])})" # noqa
         case _:
             raise ValueError("Unknown node type")
 
@@ -428,7 +440,7 @@ def main():
     generated_expr = gen_expr(
         grammar=grammar,
         index=0,
-        depth=25
+        depth=30
         )
     print(f"\nGenerated rule: {generated_expr}")
     print("\nRendering...")
