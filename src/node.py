@@ -15,6 +15,8 @@ class NodeKind(Enum):
     NK_NUMBER = 'number'
     NK_BOOLEAN = 'boolean'
     NK_SQRT = 'sqrt'
+    NK_SIN = 'sin'
+    NK_COS = 'cos'
     NK_ADD = 'add'
     NK_MULT = 'mult'
     NK_MOD = 'mod'
@@ -39,6 +41,8 @@ class Node:
             case NodeKind.NK_RULE: return f"rule({self.as_data})"
             case NodeKind.NK_BOOLEAN: return f"{self.as_data}"
             case NodeKind.NK_SQRT: return f"sqrt({self.as_data['unop']})"
+            case NodeKind.NK_SIN: return f"sin({self.as_data['unop']})"
+            case NodeKind.NK_COS: return f"cos({self.as_data['unop']})"
             case NodeKind.NK_ADD: return f"add({self.as_data['lhs']}, {self.as_data['rhs']})"
             case NodeKind.NK_MULT: return f"mult({self.as_data['lhs']}, {self.as_data['rhs']})"
             case NodeKind.NK_MOD: return f"mod({self.as_data['lhs']}, {self.as_data['rhs']})"
@@ -105,6 +109,14 @@ def node_random():
 # UNOPS
 def node_sqrt(operand):
     return NodeFactory.node_unop(NodeKind.NK_SQRT, operand)
+
+
+def node_sin(operand):
+    return NodeFactory.node_unop(NodeKind.NK_SIN, operand)
+
+
+def node_cos(operand):
+    return NodeFactory.node_unop(NodeKind.NK_COS, operand)
 
 
 # BINOPS
