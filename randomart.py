@@ -51,7 +51,7 @@ def gen_node(grammar, node, depth):
         case NodeKind.NK_RANDOM:
             return NodeFactory.node_number(random.uniform(-1.0, 1.0))
 
-        case NodeKind.NK_SQRT:
+        case NodeKind.NK_SQRT | NodeKind.NK_SIN | NodeKind.NK_COS:
             unop = gen_node(grammar, node.as_data['unop'], depth)
             return NodeFactory.node_unop(node.kind, unop)
 
@@ -109,6 +109,10 @@ def gen_fragment_expr(node: Node) -> str:
             return f"({gen_fragment_expr(node.as_data['lhs'])} < {gen_fragment_expr(node.as_data['rhs'])})"
         case NodeKind.NK_SQRT:
             return f"sqrt({gen_fragment_expr(node.as_data['unop'])})"
+        case NodeKind.NK_SIN:
+            return f"sin({gen_fragment_expr(node.as_data['unop'])})"
+        case NodeKind.NK_COS:
+            return f"cos({gen_fragment_expr(node.as_data['unop'])})"
         case NodeKind.NK_TRIPLE:
             return f"vec3({gen_fragment_expr(node.as_data['first'])}, {gen_fragment_expr(node.as_data['second'])}, {gen_fragment_expr(node.as_data['third'])})" # noqa
         case NodeKind.NK_IF:
@@ -142,7 +146,7 @@ def get_randomart_image():
     generated_expr = gen_expr(
         grammar=grammar,
         index=0,
-        depth=30
+        depth=5
         )
     print(f"\nGenerated rule: {generated_expr}")
     print("\nRendering...")

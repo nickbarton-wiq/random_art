@@ -99,7 +99,7 @@ def eval_node(expr, x, y, t) -> Node:
             return NodeFactory.node_number(t)
         case NodeKind.NK_NUMBER | NodeKind.NK_BOOLEAN:
             return expr
-        case NodeKind.NK_SQRT:
+        case NodeKind.NK_SQRT | NodeKind.NK_SIN | NodeKind.NK_COS:
             unop = eval_node(expr.as_data['unop'], x, y, t)
             return NodeFactory.node_number(math.sqrt(unop.as_data) if unop.as_data > 0 else 0)
         case NodeKind.NK_ADD:

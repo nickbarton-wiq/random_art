@@ -1,4 +1,4 @@
-from src.node import node_rule, node_triple, node_x, node_y, node_t, node_add, node_mult
+from src.node import node_rule, node_triple, node_x, node_y, node_t, node_add, node_mult, node_sin, node_cos
 
 
 class GrammarBranch:
@@ -31,6 +31,7 @@ def build_grammar() -> Grammar:
         GrammarBranch(node_rule(1)),
         GrammarBranch(node_add(node_rule(), node_rule())),
         GrammarBranch(node_mult(node_rule(), node_rule())),
+        GrammarBranch(node_cos(node_rule())),
         # GrammarBranch(node_if(node_lt(node_rule(), node_rule()), node_rule(), node_rule())),
         # GrammarBranch(node_if(node_gt(node_rule(), node_rule()), node_rule(), node_rule())),
         # GrammarBranch(node_sqrt(node_rule())),
